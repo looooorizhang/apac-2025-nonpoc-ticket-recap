@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ticket Analysis 2025 Summary — APAC Non-POC Launch Tier Analysis</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{
+      --primary:#FF760D;
+      --secondary:#FF9000;
+      --success:#1CAA53;
+      --accent:#F7BACF;
+      --text:#1e293b;
+      --bg:#f8fafc;
+      --border:#e2e8f0;
+    }
+    body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,'Noto Sans',sans-serif;background:var(--bg);color:var(--text)}
+    .chart-container{width:100%;max-width:900px;height:360px;max-height:45vh;margin:0 auto;padding:12px;border-radius:16px;background:white;border:1px solid var(--border);box-shadow:0 6px 18px rgba(16,24,40,0.03)}
+    .card{background:white;border:1px solid var(--border);border-radius:16px;box-shadow:0 6px 18px rgba(16,24,40,0.03)}
+    .chip{background:linear-gradient(90deg,var(--primary),var(--secondary));color:white;padding:6px 12px;border-radius:999px;font-weight:600}
+    .small-muted{color:rgba(30,41,59,0.65);font-size:0.92rem}
+    table{border-collapse:collapse;width:100%}
+    th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
+    code{background:#fff7ed;border:1px solid #fed7aa;padding:2px 6px;border-radius:8px}
+  
+    .section-title{color:var(--text)}
+</style>
+</head>
+<body class="p-6">
+  <div class="max-w-6xl mx-auto">
+    <header class="flex items-start justify-between mb-6 gap-6">
+      <div>
+        <h1 class="text-3xl font-bold">Ticket Analysis 2025 Summary — APAC Non-POC Launch Tier Analysis</h1>
+        <p class="small-muted mt-1">Interactive dashboard generated from the uploaded ticket dataset.</p>
+      </div>
+      <div class="text-right">
+        <div class="chip">Generated Report</div>
+        <div class="small-muted mt-2">Language: English · Layout: Interactive SPA</div>
+        <div class="small-muted">Generated: 2026-02-04 05:02 UTC</div>
+      </div>
+    </header>
+
+    <div id="runtimeError" class="hidden card p-4 mb-6 border-red-200 bg-red-50">
+      <div class="font-semibold text-red-800">Dashboard script failed to run</div>
+      <div class="small-muted mt-1">If you opened this file in a previewer (Drive / Slack), scripts may be blocked. Open the GitHub Pages URL in Chrome.</div>
+      <pre id="runtimeErrorText" class="mt-2 text-xs text-red-900 whitespace-pre-wrap"></pre>
+    </div>
+
+    <!-- KPI cards -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div class="card p-4">
+        <h3 class="font-semibold">Total tickets</h3>
+        <div id="kpiTotal" class="text-3xl font-bold mt-2">—</div>
+        <p class="small-muted mt-1">Tickets in dataset (based on rows).</p>
+      </div>
+      <div class="card p-4">
+        <h3 class="font-semibold">Median resolution (days)</h3>
+        <div id="kpiMedianDays" class="text-3xl font-bold mt-2">—</div>
+        <p class="small-muted mt-1">Median converted to days for readability.</p>
+      </div>
+      <div class="card p-4">
+        <h3 class="font-semibold">Resolved within 48h (%)</h3>
+        <div id="kpi48" class="text-3xl font-bold mt-2">—</div>
+        <p class="small-muted mt-1">SLA-style metric for decision-friendly reporting.</p>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="mb-8">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xl font-semibold">Ticket volume — by month</h2>
+        <div class="small-muted">Interactive: hover for values</div>
+      </div>
+      <div class="chart-container">
+        <canvas id="monthlyChart"></canvas>
+      </div>
+      <p class="small-muted mt-2">Tickets opened per month (based on <code>Date/Time Opened</code>).</p>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Tickets by Account Executive</h2>
+        <div class="chart-container">
+          <canvas id="aeChart"></canvas>
+        </div>
+        <p class="small-muted mt-2">Counts grouped by Account Executive (top 15 shown).</p>
+      </div>
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Tickets by Owner</h2>
+        <div class="chart-container">
+          <canvas id="ownerChart"></canvas>
+        </div>
+        <p class="small-muted mt-2">Ticket handling load per owner (top 15 shown).</p>
+      </div>
+    </section>
+
+    <section class="mb-8">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xl font-semibold">Tickets by Account Name</h2>
+        <div class="small-muted">Top 15 accounts by ticket volume</div>
+      </div>
+      <div class="chart-container">
+        <canvas id="accountChart"></canvas>
+      </div>
+      <p class="small-muted mt-2">Counts grouped by Account Name (top 15 shown).</p>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Priority distribution</h2>
+        <div class="chart-container">
+          <canvas id="priorityChart"></canvas>
+        </div>
+        <p class="small-muted mt-2">Breakdown of ticket priorities.</p>
+      </div>
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Resolution time by Priority (median)</h2>
+        <div class="chart-container">
+          <canvas id="medianChart"></canvas>
+        </div>
+        <p class="small-muted mt-2">Median resolution time in hours — stable vs outliers.</p>
+      </div>
+    </section>
+
+    <section class="mb-10 card p-4">
+      <h2 class="text-xl font-semibold mb-3">Background / Context — quick text analysis</h2>
+      <p class="small-muted mb-3">Top frequent words from Background/Context and AdOps Notes (stopwords removed).</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="p-3">
+          <h3 class="font-semibold">Background / Context — top words</h3>
+          <ul id="bgWords" class="mt-2 list-disc list-inside small-muted"></ul>
+        </div>
+        <div class="p-3">
+          <h3 class="font-semibold">AdOps Notes — top words</h3>
+          <ul id="adopsWords" class="mt-2 list-disc list-inside small-muted"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Analysis & Guidance (styled) -->
+    <section class="card p-6 mb-10">
+      <h2 class="text-2xl font-semibold mb-2">🎫 Ticket Quality Review</h2>
+      <p class="small-muted mb-6">An analysis of AdOps / AE ticket workflows highlighting priority misuse, resolution inefficiencies, and clear optimization opportunities driven by data.</p>
+
+      <h3 class="text-xl font-semibold mb-3">Background</h3>
+      <p class="text-slate-700 mb-6">To improve ticket handling efficiency and reduce back-and-forth between AE and AdOps, 95 tickets were reviewed across subject quality, background clarity, AdOps notes, priority assignment, and resolution timelines.</p>
+
+      <h3 class="text-xl font-semibold mb-3">Core Data Findings: Priority vs Resolution</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="card p-5">
+          <h4 class="font-semibold mb-3">Key Metrics Summary</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left border-b border-slate-200">
+                  <th class="py-2">Priority</th>
+                  <th>Tickets</th>
+                  <th>Close Rate</th>
+                  <th>Avg Age (hrs)</th>
+                  <th>Median Age (hrs)</th>
+                </tr>
+              </thead>
+              <tbody id="prioTableBody"></tbody>
+            </table>
+          </div>
+          <p class="small-muted mt-4">
+            Counterintuitive but critical insight: <b>“Urgent” is not resolved faster than “Normal”</b>. This suggests urgency is being used as a pressure signal instead of an execution-ready signal.
+          </p>
+        </div>
+
+        <div class="card p-5">
+          <h4 class="font-semibold mb-3">Median Resolution Time by Priority</h4>
+          <div class="chart-container" style="max-width:720px;height:320px">
+            <canvas id="medianChart2"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="text-xl font-semibold mb-3">Problems to fix</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="card p-5">
+          <h4 class="font-semibold mb-2">Problem 1 — Subject naming is not standardized</h4>
+          <p class="small-muted mb-3">Impact: searchability, routing, and reporting accuracy all degrade; duplicate work increases.</p>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <div class="font-semibold mb-2">Standard Subject Template (recommended)</div>
+            <div class="text-sm">
+              <code>[Customer / App] - [Platform] - [Request Type] - [Objective]</code>
+            </div>
+            <div class="small-muted mt-2">
+              <b>Request Type</b>: Investigation / specific action / suggestion / check<br/>
+              <b>Objective</b>: ROAS / CPI / rejection / spend / tracking / reporting
+            </div>
+            <div class="small-muted mt-3">
+              Example: <code>Lenio - iOS - Investigation - ROAS drop</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h4 class="font-semibold mb-2">Problem 2 — Background/Context is incomplete</h4>
+          <p class="small-muted mb-3">Impact: AdOps spends time clarifying instead of executing; urgent tickets become slow tickets.</p>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <div class="font-semibold mb-2">Minimum ticket format</div>
+            <ol class="list-decimal ml-5 text-sm text-slate-700 space-y-1">
+              <li><b>The Background</b>: client vertical/app, start date, daily budget, geos, KPI target (CPA/ROAS)</li>
+              <li><b>The Problem</b>: what issue, since when, impact/risk (e.g., churn risk)</li>
+              <li><b>What we have done</b> (optional): checks already performed</li>
+              <li><b>The Request</b>: clear ask, desired direction/action, deadline</li>
+            </ol>
+            <p class="mt-4 text-slate-700 small-muted font-medium">Detailed Background / Context guidance (what good looks like):</p>
+            <ul class="list-disc ml-5 mt-2 text-sm text-slate-700 small-muted space-y-1">
+              <li><b>Client / App context</b>: what app, vertical, and business model</li>
+              <li><b>Start date</b>: when the issue started (Month / Date)</li>
+              <li><b>Budget & scale</b>: daily budget amount and affected geos</li>
+              <li><b>Primary KPI</b>: CPA / ROAS goal (explicit target)</li>
+              <li><b>Current impact</b>: what changed vs baseline (performance, spend, approval, etc.)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="text-xl font-semibold mb-3">Optimization Recommendations</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="card p-5">
+          <h4 class="font-semibold mb-2">Redefine “Urgent” usage criteria</h4>
+          <ul class="list-disc ml-5 text-sm text-slate-700 space-y-1">
+            <li>Single, clearly defined objective</li>
+            <li>Explicit expected action</li>
+            <li>Immediate, measurable business impact</li>
+            <li>If not met → use High or Normal</li>
+          </ul>
+        </div>
+        <div class="card p-5">
+          <h4 class="font-semibold mb-2">Bind priority to request type</h4>
+          <p class="text-sm text-slate-700">Urgent should primarily be used for <b>Investigations</b> or <b>Checks</b> — avoid open-ended “Optimization” as default.</p>
+        </div>
+        <div class="card p-5">
+          <h4 class="font-semibold mb-2">Review long-open High tickets</h4>
+          <p class="text-sm text-slate-700">Any High priority ticket open &gt; 7 days should state: blocker + dependency owner (AE / Client / Data).</p>
+        </div>
+        <div class="card p-5">
+          <h4 class="font-semibold mb-2">Normalize “Normal” priority</h4>
+          <p class="text-sm text-slate-700">Position Normal as the standard optimization workflow — not low importance.</p>
+        </div>
+      </div>
+
+      <div class="bg-[var(--accent)]/20 border border-slate-200 rounded-2xl p-5">
+        <h4 class="font-semibold mb-2">Action checklist (what to enforce next)</h4>
+        <ul class="list-disc ml-5 text-sm text-slate-800 space-y-1">
+          <li>Enforce the subject template: Customer/App · Platform · Request Type · Objective</li>
+          <li>Make Background/Context required fields (KPI target, budget, geos, start date)</li>
+          <li>Restrict “Urgent” usage to execution-ready requests (clear ask + measurable impact)</li>
+          <li>Set weekly review for High tickets open &gt; 7 days (blockers + ownership)</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="text-center small-muted py-6">Generated automatically — interactive charts built with Chart.js · Styling with Tailwind · Font: Poppins</footer>
+  </div>
+
+  <!-- Embed data safely (prevents </script> breakage) -->
+  <script type="application/json" id="data-json">{"kpis": {"total_tickets": 95, "median_resolution_days": 3.17, "resolved_within_48h_pct": 40.0}, "monthly_counts": [{"month": "2025-01", "count": 2}, {"month": "2025-02", "count": 5}, {"month": "2025-03", "count": 12}, {"month": "2025-04", "count": 2}, {"month": "2025-05", "count": 2}, {"month": "2025-06", "count": 11}, {"month": "2025-07", "count": 13}, {"month": "2025-08", "count": 11}, {"month": "2025-09", "count": 10}, {"month": "2025-10", "count": 1}, {"month": "2025-11", "count": 12}, {"month": "2025-12", "count": 14}], "ae_counts": [{"account_executive": "April Ma", "count": 51}, {"account_executive": "Jose Li", "count": 24}, {"account_executive": "Abbas Khambati", "count": 12}, {"account_executive": "Jing Li", "count": 3}, {"account_executive": "Sina Qiu", "count": 2}, {"account_executive": "Abhishek Bhattacharjee", "count": 2}, {"account_executive": "Helen Nam", "count": 1}], "owner_counts": [{"ticket_owner": "Lori Zhang", "count": 36}, {"ticket_owner": "Ella Wang", "count": 28}, {"ticket_owner": "Vincy Wang", "count": 8}, {"ticket_owner": "Optimization Queue", "count": 5}, {"ticket_owner": "Elizabeth Teh", "count": 4}, {"ticket_owner": "Sherine Lai", "count": 4}, {"ticket_owner": "Weixin Chua", "count": 3}, {"ticket_owner": "Edrick Tan", "count": 3}, {"ticket_owner": "Valerie Loh", "count": 2}, {"ticket_owner": "Sneha Vellanki", "count": 2}], "account_counts": [{"account_name": "Guru Puzzle Game Studio", "count": 10}, {"account_name": "NewLeaf Publishing", "count": 10}, {"account_name": "Sparks Info", "count": 5}, {"account_name": "Playful Bytes", "count": 4}, {"account_name": "Happibits Game", "count": 4}, {"account_name": "MAYSQUARE LIFESTYLE / Urbanic", "count": 3}, {"account_name": "Behefun", "count": 3}, {"account_name": "HashKey Global", "count": 3}, {"account_name": "Meitu / Pixocial Technology", "count": 3}, {"account_name": "Gate.io", "count": 3}, {"account_name": "Hello Games Team", "count": 3}, {"account_name": "Crazy Maple Studio", "count": 3}, {"account_name": "BEIAN", "count": 3}, {"account_name": "Leniu", "count": 2}, {"account_name": "Zomato", "count": 2}], "priority_counts": [{"priority": "Normal", "count": 40}, {"priority": "Urgent", "count": 38}, {"priority": "High", "count": 17}], "priority_stats": [{"priority": "High", "ticket_count": 17, "close_rate": 0.7058823529411765, "avg_age_hours": 1506.3529411764705, "median_age_hours": 72.0}, {"priority": "Normal", "ticket_count": 40, "close_rate": 0.85, "avg_age_hours": 491.075, "median_age_hours": 53.5}, {"priority": "Urgent", "ticket_count": 38, "close_rate": 0.6842105263157895, "avg_age_hours": 1355.3157894736842, "median_age_hours": 153.0}], "bg_top": [["campaign", 118], ["roas", 98], ["performance", 88], ["please", 83], ["team", 78], ["help", 75], ["client", 71], ["optimization", 66], ["can", 55], ["ios", 52], ["could", 49], ["kpi", 44], ["cpa", 39], ["campaigns", 38], ["app", 36]], "adops_top": [["source", 155], ["roas", 146], ["spend", 103], ["app", 96], ["campaign", 88], ["apps", 78], ["ios", 73], ["creatives", 68], ["looker", 68], ["performance", 66], ["cpi", 65], ["liftoff", 63], ["can", 59], ["rpi", 57], ["low", 52]], "median_by_priority": {"High": 72.0, "Normal": 53.5, "Urgent": 153.0}}</script>
+
+  <script>
+    (function() {
+      function showError(e) {
+        const box = document.getElementById('runtimeError');
+        const pre = document.getElementById('runtimeErrorText');
+        if (box && pre) {
+          box.classList.remove('hidden');
+          pre.textContent = (e && (e.stack || e.message)) ? (e.stack || e.message) : String(e);
+        }
+      }
+
+      try {
+        const raw = document.getElementById('data-json')?.textContent || '{}';
+        const DATA = JSON.parse(raw);
+
+        // KPIs
+        document.getElementById('kpiTotal').innerText = DATA.kpis.total_tickets ?? '—';
+        document.getElementById('kpiMedianDays').innerText = (DATA.kpis.median_resolution_days ?? '—') + (DATA.kpis.median_resolution_days!=null ? ' days' : '');
+        document.getElementById('kpi48').innerText = (DATA.kpis.resolved_within_48h_pct ?? '—') + (DATA.kpis.resolved_within_48h_pct!=null ? '%' : '');
+
+        // Monthly chart
+        const months = (DATA.monthly_counts || []).map(d=>d.month);
+        const monthVals = (DATA.monthly_counts || []).map(d=>d.count);
+        new Chart(document.getElementById('monthlyChart').getContext('2d'), {
+          type:'bar',
+          data:{ labels: months, datasets:[{ label:'Tickets', data: monthVals, backgroundColor:'rgba(255,118,13,0.85)', borderColor:'rgba(255,118,13,1)', borderWidth:1 }] },
+          options:{ maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
+        });
+
+        // AE chart
+        const aeTop = (DATA.ae_counts || []).slice(0,15);
+        new Chart(document.getElementById('aeChart').getContext('2d'), {
+          type:'bar',
+          data:{ labels: aeTop.map(d=>d.account_executive), datasets:[{ label:'Tickets', data: aeTop.map(d=>d.count), backgroundColor:'rgba(255,144,0,0.85)', borderColor:'rgba(255,144,0,1)', borderWidth:1 }] },
+          options:{ indexAxis:'y', maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ beginAtZero:true } } }
+        });
+
+        // Owner chart
+        const ownerTop = (DATA.owner_counts || []).slice(0,15);
+        new Chart(document.getElementById('ownerChart').getContext('2d'), {
+          type:'bar',
+          data:{ labels: ownerTop.map(d=>d.ticket_owner), datasets:[{ label:'Tickets', data: ownerTop.map(d=>d.count), backgroundColor:'rgba(59,130,246,0.85)', borderColor:'rgba(59,130,246,1)', borderWidth:1 }] },
+          options:{ indexAxis:'y', maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ beginAtZero:true } } }
+        });
+
+        // Account chart
+        const acctTop = (DATA.account_counts || []).slice(0,15);
+        new Chart(document.getElementById('accountChart').getContext('2d'), {
+          type:'bar',
+          data:{ labels: acctTop.map(d=>d.account_name), datasets:[{ label:'Tickets', data: acctTop.map(d=>d.count), backgroundColor:'rgba(255,118,13,0.75)', borderColor:'rgba(255,118,13,1)', borderWidth:1 }] },
+          options:{ indexAxis:'y', maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ beginAtZero:true } } }
+        });
+
+        // Priority chart (doughnut)
+        const pr = DATA.priority_counts || [];
+        new Chart(document.getElementById('priorityChart').getContext('2d'), {
+          type:'doughnut',
+          data:{ labels: pr.map(d=>d.priority), datasets:[{
+          data: pr.map(d=>d.count),
+          backgroundColor:(ctx)=>{
+            const label = ctx.chart.data.labels[ctx.dataIndex];
+            if(label==='Normal') return 'rgba(59,130,246,0.85)';
+            if(label==='High') return 'rgba(255,144,0,0.85)';
+            if(label==='Urgent') return 'rgba(239,68,68,0.85)';
+            return 'rgba(148,163,184,0.8)';
+          },
+          borderColor:(ctx)=>{
+            const label = ctx.chart.data.labels[ctx.dataIndex];
+            if(label==='Normal') return 'rgba(59,130,246,1)';
+            if(label==='High') return 'rgba(255,144,0,1)';
+            if(label==='Urgent') return 'rgba(239,68,68,1)';
+            return 'rgba(148,163,184,1)';
+          },
+          borderWidth:1
+        }] },
+          options:{ maintainAspectRatio:false }
+        });
+
+        // Median chart by priority (two places: top and analysis)
+        const labels = ['High','Normal','Urgent'];
+        const med = labels.map(k => (DATA.median_by_priority && DATA.median_by_priority[k]) ? DATA.median_by_priority[k] : 0);
+        const chartCfg = {
+
+          type:'bar',
+          data:{ labels: labels, 
+datasets:[{
+  label:'Median resolution (hrs)',
+  data: med,
+  backgroundColor:(ctx)=>{
+    const v = ctx.chart.data.labels[ctx.dataIndex];
+    if(v==='High') return 'rgba(255,144,0,0.85)';
+    if(v==='Normal') return 'rgba(59,130,246,0.85)';
+    if(v==='Urgent') return 'rgba(239,68,68,0.85)';
+    return 'rgba(148,163,184,0.8)';
+  },
+  borderColor:(ctx)=>{
+    const v = ctx.chart.data.labels[ctx.dataIndex];
+    if(v==='High') return 'rgba(255,144,0,1)';
+    if(v==='Normal') return 'rgba(59,130,246,1)';
+    if(v==='Urgent') return 'rgba(239,68,68,1)';
+    return 'rgba(148,163,184,1)';
+  },
+  borderWidth:1
+}]
+ },
+          options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true, title:{display:true,text:'Hours'} } } }
+        };
+
+        const chartCfgBlue = {
+
+          type:'bar',
+          data:{ labels: labels, 
+datasets:[{
+  label:'Median resolution (hrs)',
+  data: med,
+  backgroundColor:(ctx)=>{
+    const v = ctx.chart.data.labels[ctx.dataIndex];
+    if(v==='High') return 'rgba(255,144,0,0.85)';
+    if(v==='Normal') return 'rgba(59,130,246,0.85)';
+    if(v==='Urgent') return 'rgba(239,68,68,0.85)';
+    return 'rgba(148,163,184,0.8)';
+  },
+  borderColor:(ctx)=>{
+    const v = ctx.chart.data.labels[ctx.dataIndex];
+    if(v==='High') return 'rgba(255,144,0,1)';
+    if(v==='Normal') return 'rgba(59,130,246,1)';
+    if(v==='Urgent') return 'rgba(239,68,68,1)';
+    return 'rgba(148,163,184,1)';
+  },
+  borderWidth:1
+}]
+ },
+          options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true, title:{display:true,text:'Hours'} } } }
+        };
+
+        new Chart(document.getElementById('medianChart').getContext('2d'), chartCfg);
+        new Chart(document.getElementById('medianChart2').getContext('2d'), chartCfgBlue);
+
+        // Priority table
+        const tbody = document.getElementById('prioTableBody');
+        if (tbody) {
+          tbody.innerHTML = '';
+          (DATA.priority_stats || []).forEach(r => {
+            const tr = document.createElement('tr');
+            const close = (r.close_rate!=null) ? (Math.round(r.close_rate*1000)/10).toFixed(1) + '%' : '—';
+            const avg = (r.avg_age_hours!=null) ? (Math.round(r.avg_age_hours*10)/10).toFixed(1) : '—';
+            const medh = (r.median_age_hours!=null) ? (Math.round(r.median_age_hours*10)/10).toFixed(1) : '—';
+            tr.innerHTML = `<td class="py-2 font-medium">${r.priority}</td><td>${r.ticket_count}</td><td>${close}</td><td>${avg}</td><td>${medh}</td>`;
+            tbody.appendChild(tr);
+          });
+        }
+
+        // Text lists
+        const bgList = document.getElementById('bgWords');
+        (DATA.bg_top || []).forEach(([w,c])=>{
+          const li=document.createElement('li');
+          li.innerText = `${w} — ${c}`;
+          bgList.appendChild(li);
+        });
+        const adList = document.getElementById('adopsWords');
+        (DATA.adops_top || []).forEach(([w,c])=>{
+          const li=document.createElement('li');
+          li.innerText = `${w} — ${c}`;
+          adList.appendChild(li);
+        });
+
+      } catch (e) {
+        showError(e);
+      }
+    })();
+  </script>
+</body>
+</html>
