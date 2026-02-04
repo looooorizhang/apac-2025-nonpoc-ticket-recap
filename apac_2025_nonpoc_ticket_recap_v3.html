@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ticket Analysis — Fancy Summary</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{
+      --primary:#FF760D; --secondary:#FF9000; --success:#1CAA53; --accent:#F7BACF;
+      --text:#1e293b; --bg:#f8fafc; --border:#e2e8f0;
+    }
+    body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,'Noto Sans',sans-serif;background:var(--bg);color:var(--text)}
+    .chart-container{width:100%;max-width:900px;height:380px;max-height:50vh;margin:0 auto;padding:12px;border-radius:12px;background:white;border:1px solid var(--border);box-shadow:0 6px 18px rgba(16,24,40,0.03)}
+    .chip{background:linear-gradient(90deg,var(--primary),var(--secondary));color:white;padding:6px 10px;border-radius:999px;font-weight:600}
+    .small-muted{color:rgba(30,41,59,0.65);font-size:0.9rem}
+    .pill{background:var(--accent);padding:6px 10px;border-radius:999px;color:var(--text);font-weight:600}
+    table{border-collapse:collapse;width:100%}
+    th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
+    .fallback{padding:14px;border-radius:12px;background:#fff;border:1px dashed var(--border);color:rgba(30,41,59,0.75)}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono','Courier New', monospace;}
+  </style>
+</head>
+<body class="p-6">
+  <div class="max-w-6xl mx-auto">
+    <header class="flex items-start justify-between mb-6">
+      <div>
+        <h1 class="text-3xl font-bold">Ticket Analysis 2025 Summary — APAC Non-POC Launch Tier Analysis</h1>
+        <p class="small-muted mt-1">Interactive dashboard generated from the uploaded ticket dataset.</p>
+      </div>
+      <div class="text-right">
+        <div class="chip">Generated Report</div>
+        <div class="small-muted mt-2">Language: English · Layout: Interactive SPA</div>
+        <div class="small-muted mt-1">Generated: 2026-02-04 03:21</div>
+      </div>
+    </header>
+
+    <div id="runtimeError" class="hidden mb-6 p-4 bg-white rounded-lg border border-[var(--border)]">
+      <h3 class="font-semibold">Dashboard script failed to run</h3>
+      <p class="small-muted mt-1">If you opened this file in a previewer (e.g., Drive preview, Slack preview), scripts may be blocked. Download and open locally in Chrome.</p>
+      <pre id="runtimeErrorMsg" class="mono mt-2 text-sm whitespace-pre-wrap"></pre>
+    </div>
+
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="p-4 bg-white rounded-lg border border-[var(--border)]">
+        <h3 class="font-semibold">Total tickets</h3>
+        <div id="totalTickets" class="text-2xl font-bold mt-2">—</div>
+        <p class="small-muted mt-1">Tickets in dataset (based on rows).</p>
+      </div>
+      <div class="p-4 bg-white rounded-lg border border-[var(--border)]">
+        <h3 class="font-semibold">Median resolution (days)</h3>
+        <div id="medianDays" class="text-2xl font-bold mt-2">—</div>
+        <p class="small-muted mt-1">Median converted to days for readability.</p>
+      </div>
+      <div class="p-4 bg-white rounded-lg border border-[var(--border)]">
+        <h3 class="font-semibold">Resolved within 48h (%)</h3>
+        <div id="sla48" class="text-2xl font-bold mt-2">—</div>
+        <p class="small-muted mt-1">SLA-style metric for decision-friendly reporting.</p>
+      </div>
+    </section>
+
+    <section class="mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xl font-semibold">Ticket volume — by month</h2>
+        <div class="small-muted">Interactive: hover for values</div>
+      </div>
+      <div class="chart-container" style="min-height:320px;"><canvas id="monthlyChart"></canvas></div>
+      <div id="monthlyFallback" class="fallback mt-3 hidden"></div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Tickets by Account Executive</h2>
+        <div class="chart-container" style="min-height:320px;"><canvas id="aeChart"></canvas></div>
+        <div id="aeFallback" class="fallback mt-3 hidden"></div>
+      </div>
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Tickets by Owner</h2>
+        <div class="chart-container" style="min-height:320px;"><canvas id="ownerChart"></canvas></div>
+        <div id="ownerFallback" class="fallback mt-3 hidden"></div>
+      </div>
+    </section>
+
+    <section class="mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xl font-semibold">Tickets by Account Name</h2>
+        <div class="small-muted">Top 15 accounts by ticket volume</div>
+      </div>
+      <div class="chart-container" style="min-height:320px;"><canvas id="accountChart"></canvas></div>
+      <div id="accountFallback" class="fallback mt-3 hidden"></div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Priority distribution</h2>
+        <div class="chart-container" style="min-height:320px;"><canvas id="priorityChart"></canvas></div>
+        <div id="priorityFallback" class="fallback mt-3 hidden"></div>
+      </div>
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Resolution time by Priority</h2>
+        <div class="chart-container" style="min-height:320px;"><canvas id="ageByPriorityChart"></canvas></div>
+        <div id="ageByPriorityFallback" class="fallback mt-3 hidden"></div>
+      </div>
+    </section>
+
+    <section class="mb-6 bg-white rounded-lg p-4 border border-[var(--border)]">
+      <h2 class="text-xl font-semibold mb-3">Background / Context — quick text analysis</h2>
+      <p class="small-muted mb-3">Top frequent words from Background/Context and AdOps Notes (stopwords removed).</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="p-3">
+          <h3 class="font-semibold">Background / Context — top words</h3>
+          <ul id="bgWords" class="mt-2 list-disc list-inside small-muted"></ul>
+        </div>
+        <div class="p-3">
+          <h3 class="font-semibold">AdOps Notes — top words</h3>
+          <ul id="adopsWords" class="mt-2 list-disc list-inside small-muted"></ul>
+        </div>
+      </div>
+    </section>
+
+    
+    <!-- Analysis & Guidance (updated) -->
+    <section class="mb-12">
+      <header class="bg-white border border-slate-200 rounded-2xl px-6 py-6">
+        <h2 class="text-3xl font-semibold">🎫 Ticket Quality Review</h2>
+        <p class="mt-2 text-slate-600 max-w-3xl small-muted">
+          An analysis of AdOps / AE ticket workflows highlighting priority misuse, resolution inefficiencies,
+          and clear optimization opportunities driven by data.
+        </p>
+      </header>
+
+      <div class="mt-8 space-y-14">
+
+        <!-- Background -->
+        <section>
+          <h3 class="text-2xl font-semibold mb-3">Background</h3>
+          <p class="text-slate-700 max-w-3xl small-muted">
+            To improve ticket handling efficiency and reduce back-and-forth between AE and AdOps,
+            this dataset was reviewed across subject quality, background clarity, AdOps notes,
+            priority assignment, and resolution timelines.
+          </p>
+        </section>
+
+        <!-- Metrics Summary -->
+        <section>
+          <h3 class="text-2xl font-semibold mb-6">Core Data Findings: Priority vs Resolution</h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+
+            <!-- Table -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h4 class="font-medium text-lg mb-4">Key Metrics Summary</h4>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="text-left border-b border-slate-200">
+                      <th class="py-2">Priority</th>
+                      <th>Tickets</th>
+                      <th>Close Rate</th>
+                      <th>Avg Age (hrs)</th>
+                      <th>Median Age (hrs)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="priorityMetrics"></tbody>
+                </table>
+              </div>
+              <p class="mt-4 text-slate-700 text-sm small-muted" id="priorityInsight">—</p>
+            </div>
+
+            <!-- Chart -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h4 class="font-medium text-lg mb-4">Median Resolution Time by Priority</h4>
+              <div class="chart-container" style="min-height:320px;">
+                <canvas id="medianChart"></canvas>
+              </div>
+              <div id="medianChartFallback" class="fallback mt-3 hidden"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Key Observations -->
+        <section>
+          <h3 class="text-2xl font-semibold mb-6">Key Observations</h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+              <h4 class="font-medium mb-2 text-[#FF760D]">Urgent Performs Worst</h4>
+              <p class="text-sm text-slate-700 small-muted">
+                Urgent tickets show the lowest close rate and longest resolution times,
+                contradicting their intended purpose.
+              </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+              <h4 class="font-medium mb-2 text-[#1CAA53]">Normal Is Healthiest</h4>
+              <p class="text-sm text-slate-700 small-muted">
+                Normal priority tickets resolve fastest, most consistently,
+                and represent the most efficient workflow baseline.
+              </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+              <h4 class="font-medium mb-2 text-[#FF9000]">High Has Long-Tail Risk</h4>
+              <p class="text-sm text-slate-700 small-muted">
+                While median resolution is reasonable, a small number of High tickets
+                remain open for weeks, inflating averages.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Issues Identified -->
+        <section>
+          <h3 class="text-2xl font-semibold mb-6">Issues Identified</h3>
+
+          <div class="space-y-6 max-w-4xl">
+            <div>
+              <h4 class="font-medium text-lg mb-1">Priority ≠ Execution Readiness</h4>
+              <p class="text-slate-700 text-sm small-muted">
+                Urgent tickets are often driven by client pressure rather than clarity,
+                leading to vague objectives and diluted urgency signals.
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-medium text-lg mb-1">Low Problem Maturity in Urgent</h4>
+              <p class="text-slate-700 text-sm small-muted">
+                Urgent tickets frequently require restructuring before action,
+                delaying investigation and optimization.
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-medium text-lg mb-1">Hidden Long-Term Blockers</h4>
+              <p class="text-slate-700 text-sm small-muted">
+                High priority tickets can mask unresolved dependencies such as
+                client feedback or data accumulation.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Root Cause -->
+        <section class="bg-white rounded-2xl p-8 border border-slate-200">
+          <h3 class="text-2xl font-semibold mb-4">Root Cause Summary</h3>
+          <p class="text-slate-700 max-w-3xl small-muted">
+            The core issue is not execution speed, but input quality and prioritization logic.
+            Priority currently conflates business pressure, severity, and execution urgency —
+            leading to unreliable signals and slower resolution.
+          </p>
+        </section>
+
+        <!-- Ticket quality standards -->
+        <section>
+          <h3 class="text-2xl font-semibold mb-6">Ticket Quality Standards</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+              <h4 class="font-medium mb-2">Standard Subject Template (recommended)</h4>
+              <div class="mono bg-slate-50 rounded-xl border border-slate-200 p-3 overflow-x-auto" id="subjectTemplate"></div>
+              <p class="text-sm text-slate-700 small-muted mt-3">Example:</p>
+              <div class="mono bg-slate-50 rounded-xl border border-slate-200 p-3 overflow-x-auto" id="subjectExample"></div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+              <h4 class="font-medium mb-2">Minimum Ticket Format (“Perfect PS ticket”)</h4>
+              <ol class="list-decimal ml-5 text-sm text-slate-700 small-muted space-y-1">
+                <li><b>The Background</b>: client vertical/app, start date, daily budget, geos, KPI target (CPA/ROAS)</li>
+                <li><b>The Problem</b>: what issue, since when, impact/risk (e.g., churn risk)</li>
+                <li><b>What we have done</b> (optional): checks already performed</li>
+                <li><b>The Request</b>: clear ask, desired direction/action, deadline</li>
+              </ol>
+<p class="mt-4 text-slate-700 small-muted font-medium">
+  Detailed Background / Context guidance (what good looks like):
+</p>
+<ul class="list-disc ml-5 mt-2 text-sm text-slate-700 small-muted space-y-1">
+  <li><b>Client / App context</b>: what app, vertical, and business model.</li>
+  <li><b>Start date</b>: when the issue started (Month / Date).</li>
+  <li><b>Budget & scale</b>: daily budget amount and affected geos.</li>
+  <li><b>Primary KPI</b>: CPA / ROAS goal (explicit target).</li>
+  <li><b>Current impact</b>: what changed vs baseline (performance, spend, approval, etc.).</li>
+</ul>
+
+              <p class="text-sm text-slate-700 small-muted mt-3" id="bgCompletenessLine">—</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Recommendations -->
+        <section>
+          <h3 class="text-2xl font-semibold mb-6">Optimization Recommendations</h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+              <h4 class="font-medium mb-2">Redefine “Urgent”</h4>
+              <ul class="list-disc ml-5 text-sm text-slate-700 small-muted space-y-1">
+                <li>Single, clearly defined objective</li>
+                <li>Explicit expected action</li>
+                <li>Immediate, measurable business impact</li>
+              </ul>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+              <h4 class="font-medium mb-2">Bind Priority to Request Type</h4>
+              <p class="text-sm text-slate-700 small-muted">
+                Urgent should primarily be used for <b>Investigations</b> or <b>Checks</b> —
+                not open-ended optimizations.
+              </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+              <h4 class="font-medium mb-2">Review Long-Open High Tickets</h4>
+              <p class="text-sm text-slate-700 small-muted">
+                Any High priority ticket open longer than <b>7 days</b> should clearly state blockers
+                and ownership (AE / Client / Data).
+              </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+              <h4 class="font-medium mb-2">Normalize “Normal”</h4>
+              <p class="text-sm text-slate-700 small-muted">
+                Position Normal as the standard optimization workflow — not low importance.
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-8 bg-white p-6 rounded-2xl border border-slate-200">
+            
+<h4 class="font-medium mb-2">Action checklist (what to enforce next)</h4>
+<ol class="list-decimal ml-5 text-sm text-slate-700 small-muted space-y-1">
+  <li>Enforce the standardized Subject template for all new PS tickets.</li>
+  <li>Require Background / Context fields before ticket submission (client/app, platform, budget, geo, KPI).</li>
+  <li>Restrict <b>Urgent</b> priority usage to Investigation or Check requests with clear objectives.</li>
+  <li>Introduce a review rule for <b>High</b> priority tickets open longer than 7 days (blocker + owner required).</li>
+  <li>Position <b>Normal</b> as the default optimization workflow, not as low importance.</li>
+</ol>
+
+          </div>
+        </section>
+
+        <!-- Takeaway -->
+        <section class="bg-[#F7BACF]/20 rounded-2xl p-8 border border-slate-200">
+          <h3 class="text-2xl font-semibold mb-3">Key Takeaway</h3>
+          <p class="text-slate-800 max-w-3xl small-muted">
+            Improving ticket efficiency is not about increasing urgency,
+            but about <b>clarity</b>, <b>structure</b>, and <b>correct prioritization</b>.
+            Better inputs enable faster, more predictable outcomes.
+          </p>
+        </section>
+
+      </div>
+    </section>
+<footer class="text-center small-muted py-6">Generated automatically — interactive charts built with Chart.js · Styling with Tailwind · Font: Poppins</footer>
+  </div>
+
+  <script id="data-json" type="application/json">{"meta": {"generated_at": "2026-02-04 03:21", "encoding": "latin1", "opened_col": "Date/Time Opened", "priority_col": "Priority", "account_col": "Account Name"}, "monthly_counts": [{"month": "2025-01", "count": 2}, {"month": "2025-02", "count": 5}, {"month": "2025-03", "count": 12}, {"month": "2025-04", "count": 2}, {"month": "2025-05", "count": 2}, {"month": "2025-06", "count": 11}, {"month": "2025-07", "count": 13}, {"month": "2025-08", "count": 11}, {"month": "2025-09", "count": 10}, {"month": "2025-10", "count": 1}, {"month": "2025-11", "count": 12}, {"month": "2025-12", "count": 14}], "ae_counts": [{"account_executive": "April Ma", "count": 51}, {"account_executive": "Jose Li", "count": 24}, {"account_executive": "Abbas Khambati", "count": 12}, {"account_executive": "Jing Li", "count": 3}, {"account_executive": "Sina Qiu", "count": 2}, {"account_executive": "Abhishek Bhattacharjee", "count": 2}, {"account_executive": "Helen Nam", "count": 1}], "owner_counts": [{"owner": "Lori Zhang", "count": 36}, {"owner": "Ella Wang", "count": 28}, {"owner": "Vincy Wang", "count": 8}, {"owner": "Optimization Queue", "count": 5}, {"owner": "Elizabeth Teh", "count": 4}, {"owner": "Sherine Lai", "count": 4}, {"owner": "Weixin Chua", "count": 3}, {"owner": "Edrick Tan", "count": 3}, {"owner": "Valerie Loh", "count": 2}, {"owner": "Sneha Vellanki", "count": 2}], "account_counts": [{"account_name": "Guru Puzzle Game Studio", "count": 10}, {"account_name": "NewLeaf Publishing", "count": 10}, {"account_name": "Sparks Info", "count": 5}, {"account_name": "Playful Bytes", "count": 4}, {"account_name": "Happibits Game", "count": 4}, {"account_name": "MAYSQUARE LIFESTYLE / Urbanic", "count": 3}, {"account_name": "Behefun", "count": 3}, {"account_name": "HashKey Global", "count": 3}, {"account_name": "Meitu / Pixocial Technology", "count": 3}, {"account_name": "Gate.io", "count": 3}, {"account_name": "Hello Games Team", "count": 3}, {"account_name": "Crazy Maple Studio", "count": 3}, {"account_name": "BEIAN", "count": 3}, {"account_name": "Leniu", "count": 2}, {"account_name": "Zomato", "count": 2}], "priority_counts": [{"priority": "Normal", "count": 40}, {"priority": "Urgent", "count": 38}, {"priority": "High", "count": 17}], "age_by_priority": [{"priority": "High", "count": 17, "mean": 1506.506862745098, "median": 72.48333333333333}, {"priority": "Normal", "count": 40, "mean": 491.1141666666666, "median": 54.05833333333334}, {"priority": "Urgent", "count": 38, "mean": 1355.3232456140352, "median": 152.86666666666667}], "age_stats": {"median_days": 3.1548611111111113, "sla_48_pct": 38.94736842105263, "count_with_duration": 95}, "priority_metrics": [{"priority": "Normal", "ticket_count": 40, "close_rate_pct": 85.0, "avg_age_hours": 491.1, "median_age_hours": 54.1}, {"priority": "Urgent", "ticket_count": 38, "close_rate_pct": 68.4, "avg_age_hours": 1355.3, "median_age_hours": 152.9}, {"priority": "High", "ticket_count": 17, "close_rate_pct": 70.6, "avg_age_hours": 1506.5, "median_age_hours": 72.5}], "bg_top": [["campaign", 112], ["roas", 93], ["performance", 88], ["please", 83], ["team", 78], ["help", 75], ["client", 71], ["optimization", 66], ["ios", 52], ["kpi", 44], ["cpa", 39], ["campaigns", 37], ["app", 32], ["last", 30], ["optimize", 30], ["check", 29], ["been", 29], ["cpi", 28], ["week", 27], ["but", 27]], "adops_top": [["source", 155], ["roas", 146], ["spend", 103], ["app", 96], ["campaign", 88], ["apps", 78], ["creatives", 68], ["looker", 67], ["performance", 66], ["cpi", 65], ["ios", 64], ["rpi", 57], ["but", 54], ["low", 52], ["vast", 47], ["cpr", 44], ["more", 44], ["share", 43], ["top", 43], ["model", 42]], "diagnostics": {"bg_missing_rate_pct": 1.0526315789473684}, "templates": {"subject_template": "[Customer / App] - [Platform] - [Request Type] - [Objective]", "subject_example": "Lenio / Lenio iOS - iOS - Investigation - ROAS drop after Jan 15"}}</script>
+
+  <script>
+    // Robust boot: avoid blank page if embedded text contains backticks etc.
+    let DATA = null;
+    try {
+      DATA = JSON.parse(document.getElementById('data-json').textContent);
+    } catch (e) {
+      const box = document.getElementById('runtimeError');
+      box.classList.remove('hidden');
+      document.getElementById('runtimeErrorMsg').textContent = String(e);
+      throw e;
+    }
+
+    function showRuntimeError(e){
+      const box = document.getElementById('runtimeError');
+      box.classList.remove('hidden');
+      document.getElementById('runtimeErrorMsg').textContent = String(e);
+    }
+    window.addEventListener('error', (ev)=>showRuntimeError(ev.error || ev.message));
+
+    // Helper: show fallback if Chart.js not available
+    function ensureChartOrFallback(canvasId, fallbackId, message){
+      if(!window.Chart){
+        const fb = document.getElementById(fallbackId);
+        if(fb){ fb.classList.remove('hidden'); fb.innerText = message || 'Chart.js failed to load. Please open with internet access.'; }
+        const canvas = document.getElementById(canvasId);
+        if(canvas && canvas.parentElement){ canvas.parentElement.style.display = 'none'; }
+        return false;
+      }
+      return true;
+    }
+
+    // KPIs
+    try {
+      const total = (function(){let t=0; (DATA.monthly_counts||[]).forEach(x=>t+=x.count); return t})();
+      document.getElementById('totalTickets').innerText = total.toLocaleString();
+      document.getElementById('medianDays').innerText = (DATA.age_stats.median_days || 0).toFixed(1) + ' days';
+      document.getElementById('sla48').innerText = (DATA.age_stats.sla_48_pct || 0).toFixed(0) + '%';
+    } catch(e) { showRuntimeError(e); }
+
+    // Monthly chart
+    try {
+      const months = (DATA.monthly_counts||[]).map(d=>d.month);
+      const monthVals = (DATA.monthly_counts||[]).map(d=>d.count);
+      if(ensureChartOrFallback('monthlyChart','monthlyFallback','Chart.js failed to load — monthly chart unavailable.')){
+        new Chart(document.getElementById('monthlyChart').getContext('2d'),{
+          type:'bar',
+          data:{labels:months, datasets:[{label:'Tickets',data:monthVals, backgroundColor: 'rgba(255,118,13,0.85)'}]},
+          options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+        });
+      }
+    } catch(e) { showRuntimeError(e); }
+
+    // AE chart
+    try {
+      const aeTop = (DATA.ae_counts||[]).slice(0,15);
+      if(aeTop.length && ensureChartOrFallback('aeChart','aeFallback','Chart.js failed to load — AE chart unavailable.')){
+        new Chart(document.getElementById('aeChart').getContext('2d'),{
+          type:'bar',
+          data:{labels: aeTop.map(d=>d.account_executive), datasets:[{label:'Tickets', data: aeTop.map(d=>d.count), backgroundColor:'rgba(255,144,0,0.85)'}]},
+          options:{indexAxis:'y', maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}}}
+        });
+      } else {
+        const fb = document.getElementById('aeFallback'); if(fb){ fb.classList.remove('hidden'); fb.innerText = aeTop.length ? fb.innerText : 'Account Executive column not found / empty.'; }
+      }
+    } catch(e) { showRuntimeError(e); }
+
+    // Owner chart
+    try {
+      const ownerTop = (DATA.owner_counts||[]).slice(0,15);
+      if(ownerTop.length && ensureChartOrFallback('ownerChart','ownerFallback','Chart.js failed to load — Owner chart unavailable.')){
+        new Chart(document.getElementById('ownerChart').getContext('2d'),{
+          type:'bar',
+          data:{labels: ownerTop.map(d=>d.owner), datasets:[{label:'Tickets', data: ownerTop.map(d=>d.count), backgroundColor:'rgba(30,41,59,0.8)'}]},
+          options:{indexAxis:'y', maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}}}
+        });
+      } else {
+        const fb = document.getElementById('ownerFallback'); if(fb){ fb.classList.remove('hidden'); fb.innerText = ownerTop.length ? fb.innerText : 'Owner column not found / empty.'; }
+      }
+    } catch(e) { showRuntimeError(e); }
+
+    // Account chart
+    try {
+      const accTop = (DATA.account_counts||[]).slice(0,15);
+      if(accTop.length && ensureChartOrFallback('accountChart','accountFallback','Chart.js failed to load — Account chart unavailable.')){
+        new Chart(document.getElementById('accountChart').getContext('2d'),{
+          type:'bar',
+          data:{labels: accTop.map(d=>d.account_name), datasets:[{label:'Tickets', data: accTop.map(d=>d.count), backgroundColor:'rgba(28,170,83,0.85)'}]},
+          options:{indexAxis:'y', maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}}}
+        });
+      } else {
+        const fb = document.getElementById('accountFallback'); if(fb){ fb.classList.remove('hidden'); fb.innerText = accTop.length ? fb.innerText : 'Account Name column not found / empty.'; }
+      }
+    } catch(e) { showRuntimeError(e); }
+
+    // Priority chart
+    try {
+      const pr = (DATA.priority_counts||[]);
+      if(pr.length && ensureChartOrFallback('priorityChart','priorityFallback','Chart.js failed to load — Priority chart unavailable.')){
+        new Chart(document.getElementById('priorityChart').getContext('2d'),{
+          type:'doughnut',
+          data:{labels: pr.map(d=>d.priority), datasets:[{data:pr.map(d=>d.count)}]},
+          options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}
+        });
+      } else {
+        const fb = document.getElementById('priorityFallback'); if(fb){ fb.classList.remove('hidden'); fb.innerText = pr.length ? fb.innerText : 'Priority column not found / empty.'; }
+      }
+    } catch(e) { showRuntimeError(e); }
+
+    // Age by priority chart
+    try {
+      const ageBP = (DATA.age_by_priority||[]);
+      if(ageBP.length && ensureChartOrFallback('ageByPriorityChart','ageByPriorityFallback','Chart.js failed to load — Resolution-by-priority chart unavailable.')){
+        new Chart(document.getElementById('ageByPriorityChart').getContext('2d'),{
+          type:'bar',
+          data:{labels: ageBP.map(d=>d.priority), datasets:[
+            {label:'Mean hours', data: ageBP.map(d=>Number(d.mean||0).toFixed(1))},
+            {label:'Median hours', data: ageBP.map(d=>Number(d.median||0).toFixed(1))}
+          ]},
+          options:{maintainAspectRatio:false, scales:{y:{beginAtZero:true}}}
+        });
+      } else {
+        const fb = document.getElementById('ageByPriorityFallback'); if(fb){ fb.classList.remove('hidden'); fb.innerText = ageBP.length ? fb.innerText : 'Not enough data to compute resolution time by priority.'; }
+      }
+    } catch(e) { showRuntimeError(e); }
+
+    // Top words lists
+    try {
+      const bgList = document.getElementById('bgWords');
+      (DATA.bg_top||[]).forEach(([w,c])=>{const li=document.createElement('li'); li.innerText = `${w} — ${c}`; bgList.appendChild(li)});
+      const adList = document.getElementById('adopsWords');
+      (DATA.adops_top||[]).forEach(([w,c])=>{const li=document.createElement('li'); li.innerText = `${w} — ${c}`; adList.appendChild(li)});
+    } catch(e) { showRuntimeError(e); }
+
+    // Analysis blocks
+    try {
+      document.getElementById('subjectTemplate').innerText = (DATA.templates && DATA.templates.subject_template) ? DATA.templates.subject_template : '';
+      document.getElementById('subjectExample').innerText = (DATA.templates && DATA.templates.subject_example) ? DATA.templates.subject_example : '';
+
+      const pm = (DATA.priority_metrics||[]);
+      const pmBody = document.getElementById('priorityMetrics');
+      if(pmBody){
+        pmBody.innerHTML='';
+        pm.forEach(r=>{
+          const tr=document.createElement('tr');
+          tr.innerHTML = `<td>${r.priority}</td><td>${r.ticket_count}</td><td>${r.close_rate_pct}%</td><td>${r.avg_age_hours}</td><td>${r.median_age_hours}</td>`;
+          pmBody.appendChild(tr);
+        });
+      }
+
+      const priInsight = document.getElementById('priorityInsight');
+      if(priInsight && pm.length){
+        const urgent = pm.find(x=>String(x.priority).toLowerCase()==='urgent');
+        const normal = pm.find(x=>String(x.priority).toLowerCase()==='normal');
+        if(urgent && normal){
+          priInsight.innerText = `Counterintuitive but critical insight: “Urgent” is not resolved faster than “Normal”. Urgent median age is ${urgent.median_age_hours} hrs vs Normal ${normal.median_age_hours} hrs, and Urgent close rate is lower (${urgent.close_rate_pct}% vs ${normal.close_rate_pct}%).`;
+        } else {
+          priInsight.innerText = 'Key insight: Priority labels are not reliably predicting faster resolution.';
+        }
+      }
+
+      const bgLine = document.getElementById('bgCompletenessLine');
+      const bgMissing = (DATA.diagnostics && DATA.diagnostics.bg_missing_rate_pct != null) ? DATA.diagnostics.bg_missing_rate_pct : null;
+      if(bgLine){
+        bgLine.innerText = (bgMissing==null)
+          ? 'Background/Context completeness could not be measured (column missing in export).'
+          : `Background/Context is missing in ~${bgMissing.toFixed(0)}% of tickets. This increases clarification rounds and delays execution.`;
+      }
+      
+      // Median Resolution Time by Priority (bar chart)
+      const medCanvas = document.getElementById('medianChart');
+      const medFallback = document.getElementById('medianChartFallback');
+      if(medCanvas){
+        const labels = pm.map(d=>d.priority);
+        const medians = pm.map(d=>Number(d.median_age_hours||0));
+        if(labels.length){
+          if(ensureChartOrFallback('medianChart','medianChartFallback','Chart.js failed to load — median chart unavailable.')){
+            try{
+              if(window.__medianChart && typeof window.__medianChart.destroy === 'function'){ window.__medianChart.destroy(); }
+              window.__medianChart = new Chart(medCanvas.getContext('2d'), {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Median Resolution Time (Hours)', data: medians, backgroundColor: 'rgba(255,118,13,0.85)' }] },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { tooltip: { enabled: true }, legend: { display: false } },
+                  scales: { y: { beginAtZero: true, title: { display: true, text: 'Hours' } } }
+                }
+              });
+            } catch(e) { showRuntimeError(e); }
+          }
+        } else if(medFallback){
+          medFallback.classList.remove('hidden');
+          medFallback.innerText = 'Not enough data to render median chart.';
+        }
+      }
+
+
+      
+      if(rec){
+        rec.innerHTML='';
+        const recommendations=[
+          'Redefine “Urgent” usage criteria: Urgent should be used only when (1) single clearly defined objective (e.g., CPI/ROAS), (2) clear expected action (Check/Investigation), and (3) immediate measurable business impact (e.g., spend spike, budget over-cap). If not met → use High or Normal.',
+          'Bind Priority to request type: Urgent tickets should primarily be Investigation / Check. Avoid using Optimization as default for Urgent (it often requires iteration and time).',
+          'Introduce review for long-open High priority tickets: if open > 7 days, ticket must state (1) what blocks closure and (2) who the dependency is on (AE / Client / Data).',
+          'Normalize “Normal” priority as the standard optimization workflow; avoid treating Normal as low importance.',
+          'Enforce input quality gates: Subject template + minimum PS ticket format (Background → Problem → What we tried → Request).'
+        ];
+        recommendations.forEach(r=>{const li=document.createElement('li'); li.innerText=r; rec.appendChild(li);});
+      }
+    } catch(e) { showRuntimeError(e); }
+  </script>
+</body>
+</html>
